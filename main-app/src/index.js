@@ -153,6 +153,17 @@ app.post('/transactions', authMiddleware, async (c) => {
         // Get the logged-in user's ID from the context
         const creditorId = c.get('userId');
 
+        // Check if all payees exist in the database
+        for (const payee of body.payees) {
+            const payeeExists = await c.env.DB.prepare(
+                'SELECT id FROM users WHERE id = ?'
+            ).bind(payee.payee_id).first();
+
+            if (!payeeExists) {
+                return c.json({ error: `Payee with ID ${payee.payee_id} does not exist` }, 400);
+            }
+        }
+
         // Generate a transaction ID
         const txId = crypto.randomUUID();
 
@@ -206,6 +217,58 @@ app.delete('/transactions/:tx_id', authMiddleware, async (c) => {
         }
 
         return c.json({ error: 'Failed to delete transaction' }, 500);
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Add a user as a known person (undirected relationship)
+app.post('/known-persons', authMiddleware, async (c) => {
+    const [body, error] = await validateRequestBody(c.req.raw);
+    if (error) return c.json({ error }, 400);
+
+    if (!body.known_user_id) {
+        return c.json({ error: 'Missing known_user_id' }, 400);
+    }
+
+    try {
+        const userId = c.get('userId');
+        const knownUserId = body.known_user_id;
+
+        // Check if the known user exists
+        const knownUserExists = await c.env.DB.prepare(
+            'SELECT id FROM users WHERE id = ?'
+        ).bind(knownUserId).first();
+
+        if (!knownUserExists) {
+            return c.json({ error: 'Known user does not exist' }, 400);
+        }
+
+        // Insert the undirected relationship
+        await c.env.DB.prepare(
+            'INSERT INTO known_persons (user_id, known_user_id) VALUES (?, ?), (?, ?)'
+        ).bind(userId, knownUserId, knownUserId, userId).run();
+
+        return c.json({ message: 'User added as known person successfully' }, 201);
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Search users by username
+app.get('/search-users', authMiddleware, async (c) => {
+    const username = c.req.query('username');
+
+    if (!username) {
+        return c.json({ error: 'Username query parameter is required' }, 400);
+    }
+
+    try {
+        const users = await c.env.DB.prepare(
+            'SELECT id, username FROM users WHERE username LIKE ? LIMIT 10'
+        ).bind(`%${username}%`).all();
+
+        return c.json({ users: users.results });
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);
     }

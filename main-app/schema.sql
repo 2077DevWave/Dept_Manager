@@ -26,3 +26,11 @@ CREATE TABLE sessions (
     created_at TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE known_persons (
+    user_id TEXT NOT NULL,
+    known_user_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, known_user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (known_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
