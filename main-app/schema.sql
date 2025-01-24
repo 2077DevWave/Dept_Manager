@@ -19,3 +19,10 @@ CREATE TABLE payees (
     share INTEGER NOT NULL,
     FOREIGN KEY (tx_id) REFERENCES transactions(tx_id) ON DELETE CASCADE
 );
+
+CREATE TABLE sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "fragrant-feather-44ce",
+  "name": "main-app",
   "main": "src/index.js",
   "compatibility_date": "2025-01-24",
   "observability": {

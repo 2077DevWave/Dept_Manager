@@ -26,6 +26,27 @@ const hashPassword = async (password) => {
     return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 };
 
+// Middleware to check if the user is logged in
+const authMiddleware = async (c, next) => {
+    const sessionToken = c.req.header('Authorization')?.split(' ')[1]; // Bearer <token>
+    if (!sessionToken) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Check if the session token exists in the database
+    const session = await c.env.DB.prepare(
+        'SELECT user_id FROM sessions WHERE session_id = ?'
+    ).bind(sessionToken).first();
+
+    if (!session) {
+        return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Attach the user ID to the context for use in subsequent handlers
+    c.set('userId', session.user_id);
+    await next();
+};
+
 // Registration endpoint
 app.post('/register', async (c) => {
     const [body, error] = await validateRequestBody(c.req.raw);
@@ -80,8 +101,13 @@ app.post('/login', async (c) => {
             return c.json({ error: 'Invalid credentials' }, 401);
         }
 
-        // Generate session token (in a real app, store this in database)
+        // Generate session token
         const sessionToken = crypto.randomUUID();
+
+        // Store session token in the database
+        await c.env.DB.prepare(
+            'INSERT INTO sessions (session_id, user_id, created_at) VALUES (?, ?, ?)'
+        ).bind(sessionToken, user.id, new Date().toISOString()).run();
 
         return c.json({
             message: 'Login successful',
@@ -93,13 +119,29 @@ app.post('/login', async (c) => {
     }
 });
 
-// Create a transaction
-app.post('/transactions', async (c) => {
+// Logout endpoint
+app.post('/logout', authMiddleware, async (c) => {
+    const sessionToken = c.req.header('Authorization')?.split(' ')[1];
+
+    try {
+        // Delete the session token from the database
+        await c.env.DB.prepare(
+            'DELETE FROM sessions WHERE session_id = ?'
+        ).bind(sessionToken).run();
+
+        return c.json({ message: 'Logout successful' });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Create a transaction (only for logged-in users)
+app.post('/transactions', authMiddleware, async (c) => {
     const [body, error] = await validateRequestBody(c.req.raw);
     if (error) return c.json({ error }, 400);
 
     // Validate transaction data
-    if (!body.creditor_id || !body.amount || !body.description || !body.payees) {
+    if (!body.amount || !body.description || !body.payees) {
         return c.json({ error: 'Missing required fields' }, 400);
     }
 
@@ -108,13 +150,16 @@ app.post('/transactions', async (c) => {
     }
 
     try {
+        // Get the logged-in user's ID from the context
+        const creditorId = c.get('userId');
+
         // Generate a transaction ID
         const txId = crypto.randomUUID();
 
         // Insert transaction into the database
         const txResult = await c.env.DB.prepare(
             'INSERT INTO transactions (tx_id, creditor_id, amount, description, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(txId, body.creditor_id, body.amount, body.description, new Date().toISOString()).run();
+        ).bind(txId, creditorId, body.amount, body.description, new Date().toISOString()).run();
 
         if (!txResult.success) {
             return c.json({ error: 'Failed to create transaction' }, 500);
@@ -141,8 +186,8 @@ app.post('/transactions', async (c) => {
     }
 });
 
-// Delete a transaction
-app.delete('/transactions/:tx_id', async (c) => {
+// Delete a transaction (only for logged-in users)
+app.delete('/transactions/:tx_id', authMiddleware, async (c) => {
     const txId = c.req.param('tx_id');
 
     try {
