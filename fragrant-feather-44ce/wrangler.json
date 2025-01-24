@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fragrant-feather-44ce",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-24",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "auth-db",
+      "database_id": "282c19f1-2821-4117-98eb-fe5c448aa4e9"
+    }
+  ]
+}
