@@ -183,8 +183,8 @@ app.post('/transactions', authMiddleware, async (c) => {
             }
 
             const payeeResult = await c.env.DB.prepare(
-                'INSERT INTO payees (tx_id, payee_id, share) VALUES (?, ?, ?)'
-            ).bind(txId, payee.payee_id, payee.share).run();
+                'INSERT INTO payees (tx_id, payee_id, share, paid) VALUES (?, ?, ?, ?)'
+            ).bind(txId, payee.payee_id, payee.share, false).run();
 
             if (!payeeResult.success) {
                 return c.json({ error: 'Failed to add payee' }, 500);
@@ -250,6 +250,72 @@ app.post('/known-persons', authMiddleware, async (c) => {
         ).bind(userId, knownUserId, knownUserId, userId).run();
 
         return c.json({ message: 'User added as known person successfully' }, 201);
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Get all users known by the authorized user
+app.get('/known-persons', authMiddleware, async (c) => {
+    const userId = c.get('userId');
+
+    try {
+        const knownPersons = await c.env.DB.prepare(
+            'SELECT u.id, u.username FROM known_persons kp JOIN users u ON kp.known_user_id = u.id WHERE kp.user_id = ?'
+        ).bind(userId).all();
+
+        return c.json({ known_persons: knownPersons.results });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Get all transactions for the authorized user (as creditor or payee)
+app.get('/transactions', authMiddleware, async (c) => {
+    const userId = c.get('userId');
+
+    try {
+        // Get transactions where the user is the creditor
+        const creditorTransactions = await c.env.DB.prepare(
+            'SELECT * FROM transactions WHERE creditor_id = ?'
+        ).bind(userId).all();
+
+        // Get transactions where the user is a payee
+        const payeeTransactions = await c.env.DB.prepare(
+            'SELECT t.* FROM transactions t JOIN payees p ON t.tx_id = p.tx_id WHERE p.payee_id = ?'
+        ).bind(userId).all();
+
+        return c.json({
+            creditor_transactions: creditorTransactions.results,
+            payee_transactions: payeeTransactions.results
+        });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Update payee payment status
+app.patch('/transactions/:tx_id/payees/:payee_id', authMiddleware, async (c) => {
+    const txId = c.req.param('tx_id');
+    const payeeId = c.req.param('payee_id');
+    const [body, error] = await validateRequestBody(c.req.raw);
+    if (error) return c.json({ error }, 400);
+
+    if (typeof body.paid !== 'boolean') {
+        return c.json({ error: 'Missing or invalid paid field' }, 400);
+    }
+
+    try {
+        // Update the payee's payment status
+        const result = await c.env.DB.prepare(
+            'UPDATE payees SET paid = ? WHERE tx_id = ? AND payee_id = ?'
+        ).bind(body.paid, txId, payeeId).run();
+
+        if (result.success) {
+            return c.json({ message: 'Payee payment status updated successfully' });
+        }
+
+        return c.json({ error: 'Failed to update payee payment status' }, 500);
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);
     }

@@ -34,3 +34,5 @@ CREATE TABLE known_persons (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (known_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+ALTER TABLE payees ADD COLUMN paid BOOLEAN DEFAULT FALSE;
