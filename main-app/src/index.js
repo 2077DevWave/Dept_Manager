@@ -1,6 +1,17 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 const app = new Hono();
+
+// CORS Middleware
+app.use('*', cors({
+    origin: '*', // Allow all origins (or specify your frontend URL, e.g., 'https://your-frontend.com')
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed HTTP methods
+    allowHeaders: ['Content-Type', 'Authorization'], // Allowed headers
+    exposeHeaders: ['Content-Length'], // Headers exposed to the client
+    credentials: true, // Allow credentials (e.g., cookies, authorization headers)
+    maxAge: 86400, // Cache CORS preflight response for 1 day
+}));
 
 // Helper function to validate request body
 const validateRequestBody = async (request) => {
