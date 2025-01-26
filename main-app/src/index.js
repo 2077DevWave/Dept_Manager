@@ -6,7 +6,7 @@ const app = new Hono();
 // CORS Middleware
 app.use('*', cors({
     origin: '*', // Allow all origins (or specify your frontend URL, e.g., 'https://your-frontend.com')
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed HTTP methods
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Allowed HTTP methods
     allowHeaders: ['Content-Type', 'Authorization'], // Allowed headers
     exposeHeaders: ['Content-Length'], // Headers exposed to the client
     credentials: true, // Allow credentials (e.g., cookies, authorization headers)
@@ -208,6 +208,38 @@ app.post('/transactions', authMiddleware, async (c) => {
     }
 });
 
+// Get transaction details by ID
+app.get('/transactions/:tx_id', authMiddleware, async (c) => {
+    const txId = c.req.param('tx_id');
+
+    try {
+        // Get transaction details
+        const transaction = await c.env.DB.prepare(
+            'SELECT * FROM transactions WHERE tx_id = ?'
+        ).bind(txId).first();
+
+        if (!transaction) {
+            return c.json({ error: 'Transaction not found' }, 404);
+        }
+
+        // Get payees for the transaction
+        const payees = await c.env.DB.prepare(
+            'SELECT payee_id, share, paid FROM payees WHERE tx_id = ?'
+        ).bind(txId).all();
+
+        return c.json({
+            tx_id: transaction.tx_id,
+            creditor_id: transaction.creditor_id,
+            amount: transaction.amount,
+            description: transaction.description,
+            created_at: transaction.created_at,
+            payees: payees.results
+        });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
 // Delete a transaction (only for logged-in users)
 app.delete('/transactions/:tx_id', authMiddleware, async (c) => {
     const txId = c.req.param('tx_id');
@@ -294,7 +326,7 @@ app.get('/transactions', authMiddleware, async (c) => {
         // Get transactions where the user is a payee
         const payeeTransactions = await c.env.DB.prepare(
             'SELECT t.* FROM transactions t JOIN payees p ON t.tx_id = p.tx_id WHERE p.payee_id = ?'
-        ).bind(userId).all();
+        ).bind(parseInt(userId)).all();
 
         return c.json({
             creditor_transactions: creditorTransactions.results,
@@ -346,6 +378,29 @@ app.get('/search-users', authMiddleware, async (c) => {
         ).bind(`%${username}%`).all();
 
         return c.json({ users: users.results });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Get user details by ID
+app.get('/users/:userId', authMiddleware, async (c) => {
+    const userId = c.req.param('userId');
+
+    try {
+        const user = await c.env.DB.prepare(
+            'SELECT id, username, created_at FROM users WHERE id = ?'
+        ).bind(userId).first();
+
+        if (!user) {
+            return c.json({ error: 'User not found' }, 404);
+        }
+
+        return c.json({
+            id: user.id,
+            username: user.username,
+            created_at: user.created_at
+        });
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);
     }
