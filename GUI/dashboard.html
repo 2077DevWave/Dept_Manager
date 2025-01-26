@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .logout-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        .add-transaction-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .transaction-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-card {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .load-more-button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .clear-all-button {
+            padding: 5px 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .payee-list {
+            margin-top: 10px;
+        }
+        .payee-item {
+            padding: 5px;
+            border: 1px solid #eee;
+            margin-top: 5px;
+        }
+    </style>
+    <script>
+        const API_URL = 'https://main-app.sswsuport.workers.dev';
+        let sessionToken = localStorage.getItem('sessionToken');
+        let userId = null;
+
+        // Redirect to auth.html if not logged in
+        if (!sessionToken) {
+            window.location.href = 'auth.html';
+        }
+
+        // Fetch user details and transactions on page load
+        window.onload = async () => {
+            await fetchUserDetails();
+            await fetchTransactions();
+            await fetchUserBalances();
+        };
+
+        // Fetch user details (e.g., user ID)
+        async function fetchUserDetails() {
+            try {
+                const response = await fetch(`${API_URL}/transactions`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch user details');
+                }
+
+                const data = await response.json();
+                userId = data.creditor_transactions?.[0]?.creditor_id || data.payee_transactions?.[0]?.payee_id;
+            } catch (error) {
+                console.error('Error fetching user details:', error);
+                logout();
+            }
+        }
+
+        // Fetch transactions related to the current user
+        async function fetchTransactions() {
+            try {
+                const response = await fetch(`${API_URL}/transactions`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch transactions');
+                }
+
+                const data = await response.json();
+                renderTransactions(data.creditor_transactions, data.payee_transactions);
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+            }
+        }
+
+        // Render transactions
+        async function renderTransactions(creditorTransactions, payeeTransactions) {
+            const transactionsContainer = document.getElementById('transactions');
+            transactionsContainer.innerHTML = '';
+
+            const allTransactions = [...(creditorTransactions || []), ...(payeeTransactions || [])];
+            allTransactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            for (const tx of allTransactions) {
+                // Fetch full transaction details including payees
+                const txDetails = await fetchTransactionDetails(tx.tx_id);
+                const txElement = document.createElement('div');
+                txElement.className = 'transaction-item';
+                txElement.innerHTML = `
+                    <div>
+                        <strong>${txDetails.description}</strong> - $${txDetails.amount}
+                        <br>
+                        <small>${new Date(txDetails.created_at).toLocaleString()}</small>
+                        <div class="payee-list">
+                            ${txDetails.payees.map(payee => `
+                                <div class="payee-item">
+                                    Payee ID: ${payee.payee_id}, Share: $${payee.share}, Paid: ${payee.paid ? 'Yes' : 'No'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ${txDetails.creditor_id === userId ? `<button onclick="deleteTransaction('${txDetails.tx_id}')">Delete</button>` : ''}
+                `;
+                transactionsContainer.appendChild(txElement);
+            }
+        }
+
+        // Fetch full transaction details including payees
+        async function fetchTransactionDetails(txId) {
+            try {
+                const response = await fetch(`${API_URL}/transactions/${txId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch transaction details');
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching transaction details:', error);
+                return { payees: [] }; // Return empty payees array in case of error
+            }
+        }
+
+        // Delete a transaction
+        async function deleteTransaction(txId) {
+            try {
+                const response = await fetch(`${API_URL}/transactions/${txId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete transaction');
+                }
+
+                alert('Transaction deleted successfully');
+                await fetchTransactions();
+            } catch (error) {
+                console.error('Error deleting transaction:', error);
+            }
+        }
+
+        // Fetch user balances
+        async function fetchUserBalances() {
+            try {
+                const response = await fetch(`${API_URL}/transactions`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch user balances');
+                }
+
+                const data = await response.json();
+                const allTransactions = [...(data.creditor_transactions || []), ...(data.payee_transactions || [])];
+                const balances = await calculateBalances(allTransactions);
+                fetchUsernamesForBalances(balances);
+            } catch (error) {
+                console.error('Error fetching user balances:', error);
+            }
+        }
+
+        // Calculate balances between users
+        async function calculateBalances(transactions) {
+            const balances = {};
+            const processedTxIds = new Set(); // Track processed transaction IDs
+
+            for (const tx of transactions) {
+                // Skip if this transaction has already been processed
+                if (processedTxIds.has(tx.tx_id)) {
+                    continue;
+                }
+                processedTxIds.add(tx.tx_id); // Mark this transaction as processed
+
+                // Fetch full transaction details including payees
+                const txDetails = await fetchTransactionDetails(tx.tx_id);
+
+                if (txDetails.creditor_id === userId) {
+                    // Current user is the creditor
+                    txDetails.payees.forEach(payee => {
+                        if (!balances[payee.payee_id]) {
+                            balances[payee.payee_id] = 0;
+                        }
+                        balances[payee.payee_id] += payee.share;
+                    });
+                } else {
+                    // Current user is a payee
+                    if (!balances[txDetails.creditor_id]) {
+                        balances[txDetails.creditor_id] = 0;
+                    }
+                    const payee = txDetails.payees.find(p => p.payee_id === userId);
+                    if (payee) {
+                        balances[txDetails.creditor_id] -= payee.share;
+                    }
+                }
+            }
+
+            return balances;
+        }
+
+        // Fetch usernames for user IDs in balances
+        async function fetchUsernamesForBalances(balances) {
+            const userIds = Object.keys(balances);
+            const userDetails = {};
+
+            try {
+                for (const userId of userIds) {
+                    const response = await fetch(`${API_URL}/users/${userId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${sessionToken}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        const user = await response.json();
+                        userDetails[userId] = user.username;
+                    } else if (response.status === 404) {
+                        userDetails[userId] = `User ID: ${userId}`; // Fallback if user not found
+                    } else {
+                        throw new Error('Failed to fetch user details');
+                    }
+                }
+
+                renderUserBalances(balances, userDetails);
+            } catch (error) {
+                console.error('Error fetching usernames:', error);
+            }
+        }
+
+        // Render user balances with usernames
+        function renderUserBalances(balances, userDetails) {
+            const userBalancesContainer = document.getElementById('user-balances');
+            userBalancesContainer.innerHTML = '';
+
+            Object.keys(balances).forEach(userId => {
+                const balance = balances[userId];
+                const username = userDetails[userId] || `User ID: ${userId}`; // Fallback to user ID if username is not found
+                const userCard = document.createElement('div');
+                userCard.className = 'user-card';
+                userCard.innerHTML = `
+                    <div>
+                        <strong>${username}</strong>
+                        <br>
+                        Balance: ${balance >= 0 ? '+' : '-'}$${Math.abs(balance)}
+                    </div>
+                    <button class="clear-all-button" onclick="clearAllTransactions('${userId}')">Clear All</button>
+                `;
+                userBalancesContainer.appendChild(userCard);
+            });
+        }
+
+        // Clear all transactions with a user
+        async function clearAllTransactions(otherUserId) {
+            try {
+                const response = await fetch(`${API_URL}/transactions/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ otherUserId })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to clear transactions');
+                }
+
+                alert('All transactions cleared successfully');
+                await fetchUserBalances();
+            } catch (error) {
+                console.error('Error clearing transactions:', error);
+            }
+        }
+
+        // Logout
+        function logout() {
+            localStorage.removeItem('sessionToken');
+            window.location.href = 'auth.html';
+        }
+    </script>
+</head>
+<body>
+    <button class="logout-button" onclick="logout()">Logout</button>
+    <h1>Dashboard</h1>
+
+    <!-- Transactions Section -->
+    <div class="section">
+        <h2>Latest Transactions</h2>
+        <div id="transactions"></div>
+        <button class="load-more-button" onclick="fetchTransactions()">Load More</button>
+    </div>
+
+    <!-- User Balances Section -->
+    <div class="section">
+        <h2>User Balances</h2>
+        <div id="user-balances"></div>
+    </div>
+
+    <!-- Fixed Button to Add New Transaction -->
+    <button class="add-transaction-button" onclick="window.location.href='add-transaction.html'">Add Transaction</button>
+</body>
+</html>

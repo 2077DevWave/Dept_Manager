@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Login Status</title>
+    <script>
+        // Function to check if the user is logged in
+        async function checkLoginStatus() {
+            // Retrieve the session token from localStorage
+            const sessionToken = localStorage.getItem('sessionToken');
+
+            if (!sessionToken) {
+                // If no session token, redirect to auth.html
+                window.location.href = 'auth.html';
+                return;
+            }
+
+            // Validate the session token with the API
+            try {
+                const response = await fetch('https://main-app.sswsuport.workers.dev/transactions', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    // If the token is valid, redirect to dashboard.html
+                    window.location.href = 'dashboard.html';
+                } else {
+                    // If the token is invalid, clear it and redirect to auth.html
+                    localStorage.removeItem('sessionToken');
+                    window.location.href = 'auth.html';
+                }
+            } catch (error) {
+                console.error('Error checking login status:', error);
+                localStorage.removeItem('sessionToken');
+                window.location.href = 'auth.html';
+            }
+        }
+
+        // Run the check on page load
+        checkLoginStatus();
+    </script>
+</head>
+<body>
+    <h1>Checking Login Status...</h1>
+    <p>Please wait while we verify your session.</p>
+</body>
+</html>
