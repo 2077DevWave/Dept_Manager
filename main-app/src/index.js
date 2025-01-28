@@ -152,13 +152,16 @@ app.post('/transactions', authMiddleware, async (c) => {
     if (error) return c.json({ error }, 400);
 
     // Validate transaction data
-    if (!body.amount || !body.description || !body.payees) {
+    if (!body.description || !body.payees) {
         return c.json({ error: 'Missing required fields' }, 400);
     }
 
     if (!Array.isArray(body.payees) || body.payees.length === 0) {
         return c.json({ error: 'Payees must be a non-empty array' }, 400);
     }
+
+    // Validate transaction type (default to 'regular' if not provided)
+    const transactionType = body.type || 'regular';
 
     try {
         // Get the logged-in user's ID from the context
@@ -178,10 +181,10 @@ app.post('/transactions', authMiddleware, async (c) => {
         // Generate a transaction ID
         const txId = crypto.randomUUID();
 
-        // Insert transaction into the database
+        // Insert transaction into the database (without amount)
         const txResult = await c.env.DB.prepare(
-            'INSERT INTO transactions (tx_id, creditor_id, amount, description, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(txId, creditorId, body.amount, body.description, new Date().toISOString()).run();
+            'INSERT INTO transactions (tx_id, creditor_id, description, type, created_at) VALUES (?, ?, ?, ?, ?)'
+        ).bind(txId, creditorId, body.description, transactionType, new Date().toISOString()).run();
 
         if (!txResult.success) {
             return c.json({ error: 'Failed to create transaction' }, 500);
@@ -194,11 +197,20 @@ app.post('/transactions', authMiddleware, async (c) => {
             }
 
             const payeeResult = await c.env.DB.prepare(
-                'INSERT INTO payees (tx_id, payee_id, share, paid) VALUES (?, ?, ?, ?)'
-            ).bind(txId, payee.payee_id, payee.share, false).run();
+                'INSERT INTO payees (tx_id, payee_id, share) VALUES (?, ?, ?)'
+            ).bind(txId, payee.payee_id, payee.share).run();
 
             if (!payeeResult.success) {
                 return c.json({ error: 'Failed to add payee' }, 500);
+            }
+        }
+
+        // If the transaction is a transfer, mark the payee's share as paid
+        if (transactionType === 'transfer') {
+            for (const payee of body.payees) {
+                await c.env.DB.prepare(
+                    'UPDATE payees SET paid = true WHERE tx_id = ? AND payee_id = ?'
+                ).bind(txId, payee.payee_id).run();
             }
         }
 
@@ -224,14 +236,14 @@ app.get('/transactions/:tx_id', authMiddleware, async (c) => {
 
         // Get payees for the transaction
         const payees = await c.env.DB.prepare(
-            'SELECT payee_id, share, paid FROM payees WHERE tx_id = ?'
+            'SELECT payee_id, share FROM payees WHERE tx_id = ?'
         ).bind(txId).all();
 
         return c.json({
             tx_id: transaction.tx_id,
             creditor_id: transaction.creditor_id,
-            amount: transaction.amount,
             description: transaction.description,
+            type: transaction.type,
             created_at: transaction.created_at,
             payees: payees.results
         });
@@ -320,45 +332,36 @@ app.get('/transactions', authMiddleware, async (c) => {
     try {
         // Get transactions where the user is the creditor
         const creditorTransactions = await c.env.DB.prepare(
-            'SELECT * FROM transactions WHERE creditor_id = ?'
+            `SELECT t.*, 
+                    json_group_array(json_object('payee_id', p.payee_id, 'share', p.share)) AS payees
+             FROM transactions t
+             LEFT JOIN payees p ON t.tx_id = p.tx_id
+             WHERE t.creditor_id = ?
+             GROUP BY t.tx_id`
         ).bind(userId).all();
 
         // Get transactions where the user is a payee
         const payeeTransactions = await c.env.DB.prepare(
-            'SELECT t.* FROM transactions t JOIN payees p ON t.tx_id = p.tx_id WHERE p.payee_id = ?'
-        ).bind(parseInt(userId)).all();
+            `SELECT t.*, 
+                    json_group_array(json_object('payee_id', p.payee_id, 'share', p.share)) AS payees
+             FROM transactions t
+             JOIN payees p ON t.tx_id = p.tx_id
+             WHERE p.payee_id = ?
+             GROUP BY t.tx_id`
+        ).bind(userId).all();
+
+        // Parse the payees JSON string into an array
+        const parsePayees = (transactions) => {
+            return transactions.results.map((tx) => ({
+                ...tx,
+                payees: JSON.parse(tx.payees)
+            }));
+        };
 
         return c.json({
-            creditor_transactions: creditorTransactions.results,
-            payee_transactions: payeeTransactions.results
+            creditor_transactions: parsePayees(creditorTransactions),
+            payee_transactions: parsePayees(payeeTransactions)
         });
-    } catch (err) {
-        return c.json({ error: 'Server error' }, 500);
-    }
-});
-
-// Update payee payment status
-app.patch('/transactions/:tx_id/payees/:payee_id', authMiddleware, async (c) => {
-    const txId = c.req.param('tx_id');
-    const payeeId = c.req.param('payee_id');
-    const [body, error] = await validateRequestBody(c.req.raw);
-    if (error) return c.json({ error }, 400);
-
-    if (typeof body.paid !== 'boolean') {
-        return c.json({ error: 'Missing or invalid paid field' }, 400);
-    }
-
-    try {
-        // Update the payee's payment status
-        const result = await c.env.DB.prepare(
-            'UPDATE payees SET paid = ? WHERE tx_id = ? AND payee_id = ?'
-        ).bind(body.paid, txId, payeeId).run();
-
-        if (result.success) {
-            return c.json({ message: 'Payee payment status updated successfully' });
-        }
-
-        return c.json({ error: 'Failed to update payee payment status' }, 500);
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);
     }

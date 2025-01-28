@@ -8,7 +8,7 @@ CREATE TABLE users (
 CREATE TABLE transactions (
     tx_id TEXT PRIMARY KEY,
     creditor_id INTEGER NOT NULL,
-    amount INTEGER NOT NULL,
+    type TEXT DEFAULT 'regular',
     description TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
