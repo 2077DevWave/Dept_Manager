@@ -1,0 +1,371 @@
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transactions</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"></link>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .card {
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .card:hover {
+            transform: scale(1.02);
+        }
+        .section-title::after {
+            content: '';
+            width: 60px;
+            height: 4px;
+            background-color: #007bff;
+            display: block;
+            margin: 0.5rem auto 0;
+            border-radius: 2px;
+        }
+        .toggle-button {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .toggle-button .btn {
+            border-radius: 0;
+            border: 1px solid #007bff;
+            color: #007bff;
+            background-color: #f8f9fa;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .toggle-button .btn.active {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .alert-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+<!-- navbar start -->
+<p style="margin-top: 70px;"></p>
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+ <div class="container">
+  <a class="navbar-brand font-weight-bold" href="#">
+   Dept Manager
+  </a>
+  <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-target="#navbarNav" data-toggle="collapse" type="button">
+   <span class="navbar-toggler-icon">
+   </span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+   <ul class="navbar-nav ml-auto">
+    <li class="nav-item">
+     <a class="nav-link" href="/index.html">
+      Home
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="/add-transaction.html">
+      Add Transaction
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="/transactions.html">
+      Transactions
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="#" id="logout-link">
+      Logout
+     </a>
+    </li>
+   </ul>
+  </div>
+ </div>
+</nav>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js">
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js">
+</script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js">
+</script>
+<script>
+ document.getElementById('logout-link').addEventListener('click', function() {
+   localStorage.removeItem('sessionToken');
+   window.location.href = 'index.html';
+ });
+</script>
+<!-- navbar end -->
+    <div class="container py-5">
+        <h1 class="text-center mb-5">Transactions</h1>
+        <div class="filter-options d-flex flex-wrap justify-content-between align-items-center mb-4">
+            <input type="text" id="filter-description" class="form-control mb-2" placeholder="Filter by description" oninput="filterTransactions()">
+            <input type="date" id="filter-date" class="form-control mb-2" oninput="filterTransactions()">
+            <select id="filter-type" class="form-control mb-2" onchange="filterTransactions()">
+                <option value="">All types</option>
+                <option value="regular">Regular</option>
+                <option value="transfer">Transfer</option>
+            </select>
+        </div>
+        <div class="toggle-button d-flex justify-content-center mb-4">
+            <button id="creditor-button" class="btn btn-light active" onclick="toggleTransactions('creditor')">Creditor Transactions</button>
+            <button id="payee-button" class="btn btn-light" onclick="toggleTransactions('payee')">Payee Transactions</button>
+        </div>
+        <div id="creditor-section">
+            <h2 class="section-title text-center mb-4">Creditor Transactions</h2>
+            <div id="creditor-transactions">
+                <!-- Creditor transactions will be added here -->
+            </div>
+        </div>
+        <div id="payee-section" style="display: none;">
+            <h2 class="section-title text-center mb-4">Payee Transactions</h2>
+            <div id="payee-transactions">
+                <!-- Payee transactions will be added here -->
+            </div>
+        </div>
+    </div>
+    <div id="alert-container" class="alert-container"></div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete this transaction?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteTransaction()">Yes, delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+<script>
+    let transactionsData = null;
+    let userId = null;
+    let transactionToDelete = null;
+
+    const sessionToken = localStorage.getItem('sessionToken');
+    if (!sessionToken) {
+        // If no session token, redirect to auth.html
+        window.location.href = 'auth.html';
+    }
+
+    async function fetchUserId() {
+        const response = await fetch('https://main-app.sswsuport.workers.dev/me', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`
+            }
+        });
+
+        if (!response.ok) {
+            showAlert('Failed to fetch user details. Please try again.', 'danger');
+            return null;
+        }
+
+        const data = await response.json();
+        return data.id;
+    }
+
+    async function fetchTransactions() {
+        userId = await fetchUserId();
+        if (!userId) return;
+
+        const response = await fetch('https://main-app.sswsuport.workers.dev/transactions', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`
+            }
+        });
+
+        if (!response.ok) {
+            showAlert('Failed to fetch transactions. Please try again.', 'danger');
+            return;
+        }
+
+        transactionsData = await response.json();
+        displayTransactions(transactionsData, userId);
+    }
+
+    function normalizeDate(dateString) {
+        const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    }
+
+    function formatPrice(price) {
+        return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    function displayTransactions(data, userId) {
+        const creditorContainer = document.getElementById('creditor-transactions');
+        const payeeContainer = document.getElementById('payee-transactions');
+
+        const sortedCreditorTransactions = data.creditor_transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const sortedPayeeTransactions = data.payee_transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        creditorContainer.innerHTML = '';
+        payeeContainer.innerHTML = '';
+
+        sortedCreditorTransactions.forEach(tx => {
+            const txElement = document.createElement('div');
+            txElement.className = 'card mb-4 border-start border-primary';
+            txElement.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="card-title">${tx.description}</h5>
+                        <i class="fas ${tx.type === 'regular' ? 'fa-hand-holding-usd' : 'fa-exchange-alt'} text-primary"></i>
+                    </div>
+                    <p class="card-text"><i class="fas fa-calendar-alt text-primary"></i> <strong>${normalizeDate(tx.created_at)}</strong></p>
+                    <h6 class="card-subtitle mb-2 text-muted">Payees:</h6>
+                    <ul class="list-group list-group-flush">
+                        ${tx.payees.map(payee => `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>${payee.username}</span>
+                                <span class="badge bg-primary">$${formatPrice(payee.share)}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                    ${tx.creditor_id === userId ? `<button class="btn btn-danger mt-3" onclick="confirmDeleteTransaction('${tx.tx_id}')">Delete</button>` : ''}
+                </div>
+            `;
+            creditorContainer.appendChild(txElement);
+        });
+
+        sortedPayeeTransactions.forEach(tx => {
+            const currentUserShare = tx.payees.find(payee => payee.payee_id === userId).share;
+            const txElement = document.createElement('div');
+            txElement.className = 'card mb-4 border-start border-success';
+            txElement.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="card-title text-success">${tx.description}</h5>
+                        <i class="fas ${tx.type === 'regular' ? 'fa-hand-holding-usd' : 'fa-exchange-alt'} text-success"></i>
+                    </div>
+                    <p class="card-text"><i class="fas fa-calendar-alt text-success"></i> <strong>${normalizeDate(tx.created_at)}</strong></p>
+                    <h6 class="card-subtitle mb-2 text-muted">Creditor: ${tx.creditor_username}</h6>
+                    <p class="card-text">Your share: <strong>$${formatPrice(currentUserShare)}</strong></p>
+                </div>
+            `;
+            payeeContainer.appendChild(txElement);
+        });
+    }
+
+    function toggleTransactions(type) {
+        const creditorSection = document.getElementById('creditor-section');
+        const payeeSection = document.getElementById('payee-section');
+        const creditorButton = document.getElementById('creditor-button');
+        const payeeButton = document.getElementById('payee-button');
+
+        if (type === 'creditor') {
+            creditorSection.style.display = 'block';
+            payeeSection.style.display = 'none';
+            creditorButton.classList.add('active');
+            payeeButton.classList.remove('active');
+        } else {
+            creditorSection.style.display = 'none';
+            payeeSection.style.display = 'block';
+            creditorButton.classList.remove('active');
+            payeeButton.classList.add('active');
+        }
+    }
+
+    function filterTransactions() {
+        const filterDescription = document.getElementById('filter-description').value.toLowerCase();
+        const filterDate = document.getElementById('filter-date').value;
+        const filterType = document.getElementById('filter-type').value.toLowerCase();
+
+        const creditorTransactions = document.getElementById('creditor-transactions').children;
+        const payeeTransactions = document.getElementById('payee-transactions').children;
+
+        Array.from(creditorTransactions).forEach(tx => {
+            const description = tx.querySelector('.card-title').textContent.toLowerCase();
+            const date = new Date(tx.querySelector('.card-text strong').textContent).toISOString().split('T')[0];
+            const type = tx.querySelector('.fas').classList.contains('fa-hand-holding-usd') ? 'regular' : 'transfer';
+
+            if ((description.includes(filterDescription) || !filterDescription) &&
+                (date === filterDate || !filterDate) &&
+                (type.includes(filterType) || !filterType)) {
+                tx.style.display = 'block';
+            } else {
+                tx.style.display = 'none';
+            }
+        });
+
+        Array.from(payeeTransactions).forEach(tx => {
+            const description = tx.querySelector('.card-title').textContent.toLowerCase();
+            const date = new Date(tx.querySelector('.card-text strong').textContent).toISOString().split('T')[0];
+            const type = tx.querySelector('.fas').classList.contains('fa-hand-holding-usd') ? 'regular' : 'transfer';
+
+            if ((description.includes(filterDescription) || !filterDescription) &&
+                (date === filterDate || !filterDate) &&
+                (type.includes(filterType) || !filterType)) {
+                tx.style.display = 'block';
+            } else {
+                tx.style.display = 'none';
+            }
+        });
+    }
+
+    function confirmDeleteTransaction(transactionId) {
+        transactionToDelete = transactionId;
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        deleteModal.show();
+    }
+
+    function deleteTransaction() {
+        const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+        deleteModal.hide();
+
+        // Call the API to delete the transaction
+        fetch(`https://main-app.sswsuport.workers.dev/transactions/${transactionToDelete}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${sessionToken}`
+            }
+        }).then(response => {
+            if (response.ok) {
+                showAlert('Transaction deleted successfully.', 'success');
+                fetchTransactions();
+            } else {
+                showAlert('Failed to delete transaction. Please try again.', 'danger');
+            }
+        });
+    }
+
+    function showAlert(message, type) {
+        const alertContainer = document.getElementById('alert-container');
+        const alertElement = document.createElement('div');
+        alertElement.className = `alert alert-${type} alert-dismissible fade show`;
+        alertElement.role = 'alert';
+        alertElement.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        alertContainer.appendChild(alertElement);
+
+        setTimeout(() => {
+            alertElement.classList.remove('show');
+            alertElement.classList.add('hide');
+            setTimeout(() => {
+                alertElement.remove();
+            }, 500);
+        }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchTransactions);
+</script>
+</html>

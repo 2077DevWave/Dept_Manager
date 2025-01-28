@@ -17,7 +17,6 @@ CREATE TABLE payees (
     tx_id TEXT NOT NULL,
     payee_id INTEGER NOT NULL,
     share INTEGER NOT NULL,
-    paid BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (tx_id) REFERENCES transactions(tx_id) ON DELETE CASCADE
 );
 

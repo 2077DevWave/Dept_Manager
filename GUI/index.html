@@ -1,11 +1,14 @@
-<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Check Login Status</title>
-    <script>
-        // Function to check if the user is logged in
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>
+   Check Login Status
+  </title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+  <script>
+   // Function to check if the user is logged in
         async function checkLoginStatus() {
             // Retrieve the session token from localStorage
             const sessionToken = localStorage.getItem('sessionToken');
@@ -42,10 +45,57 @@
 
         // Run the check on page load
         checkLoginStatus();
-    </script>
-</head>
-<body>
-    <h1>Checking Login Status...</h1>
-    <p>Please wait while we verify your session.</p>
-</body>
+  </script>
+  <style>
+   .spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner div {
+            width: 10px;
+            height: 10px;
+            margin: 3px;
+            background-color: #333;
+            border-radius: 50%;
+            animation: spinner 1.2s infinite ease-in-out both;
+        }
+
+        .spinner div:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .spinner div:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes spinner {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+  </style>
+ </head>
+ <body class="bg-light d-flex align-items-center justify-content-center min-vh-100">
+  <div class="bg-white p-5 rounded-lg shadow text-center">
+   <div class="spinner mb-4">
+    <div>
+    </div>
+    <div>
+    </div>
+    <div>
+    </div>
+   </div>
+   <h1 class="h4 font-weight-bold mb-2">
+    Checking Login Status...
+   </h1>
+   <p class="text-muted">
+    Please wait while we verify your session.
+   </p>
+  </div>
+ </body>
 </html>

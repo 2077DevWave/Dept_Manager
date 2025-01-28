@@ -205,15 +205,6 @@ app.post('/transactions', authMiddleware, async (c) => {
             }
         }
 
-        // If the transaction is a transfer, mark the payee's share as paid
-        if (transactionType === 'transfer') {
-            for (const payee of body.payees) {
-                await c.env.DB.prepare(
-                    'UPDATE payees SET paid = true WHERE tx_id = ? AND payee_id = ?'
-                ).bind(txId, payee.payee_id).run();
-            }
-        }
-
         return c.json({ message: 'Transaction created successfully', tx_id: txId }, 201);
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);
@@ -236,7 +227,8 @@ app.get('/transactions/:tx_id', authMiddleware, async (c) => {
 
         // Get payees for the transaction
         const payees = await c.env.DB.prepare(
-            'SELECT payee_id, share FROM payees WHERE tx_id = ?'
+            `SELECT p.payee_id, p.share, u.username FROM payees p
+            JOIN users u ON p.payee_id = u.id WHERE p.tx_id = ?`
         ).bind(txId).all();
 
         return c.json({
@@ -257,6 +249,20 @@ app.delete('/transactions/:tx_id', authMiddleware, async (c) => {
     const txId = c.req.param('tx_id');
 
     try {
+        // Check if the user is the creditor of the transaction
+        const transaction = await c.env.DB.prepare(
+            'SELECT creditor_id FROM transactions WHERE tx_id = ?'
+        ).bind(txId).first();
+
+        if (!transaction) {
+            return c.json({ error: 'Transaction not found' }, 404);
+        }
+
+        const userId = c.get('userId');
+        if (transaction.creditor_id !== userId) {
+            return c.json({ error: 'You are not authorized to delete this transaction' }, 403);
+        }
+        
         // Delete payees associated with the transaction
         await c.env.DB.prepare(
             'DELETE FROM payees WHERE tx_id = ?'
@@ -316,12 +322,22 @@ app.get('/known-persons', authMiddleware, async (c) => {
 
     try {
         const knownPersons = await c.env.DB.prepare(
-            'SELECT u.id, u.username FROM known_persons kp JOIN users u ON kp.known_user_id = u.id WHERE kp.user_id = ?'
-        ).bind(userId).all();
+            `SELECT u.id, u.username
+            FROM known_persons kp
+            JOIN users u ON u.id = kp.known_user_id
+            WHERE kp.user_id = ?
+            
+            UNION
+            
+            SELECT u.id, u.username
+            FROM known_persons kp
+            JOIN users u ON u.id = kp.user_id
+            WHERE kp.known_user_id = ?`
+        ).bind(userId,userId).all();
 
         return c.json({ known_persons: knownPersons.results });
     } catch (err) {
-        return c.json({ error: 'Server error' }, 500);
+        return c.json({ error: 'Server error' }, 501);
     }
 });
 
@@ -332,22 +348,53 @@ app.get('/transactions', authMiddleware, async (c) => {
     try {
         // Get transactions where the user is the creditor
         const creditorTransactions = await c.env.DB.prepare(
-            `SELECT t.*, 
-                    json_group_array(json_object('payee_id', p.payee_id, 'share', p.share)) AS payees
-             FROM transactions t
-             LEFT JOIN payees p ON t.tx_id = p.tx_id
-             WHERE t.creditor_id = ?
-             GROUP BY t.tx_id`
+            `SELECT 
+                t.*, 
+                json_group_array(
+                    json_object(
+                        'payee_id', p.payee_id, 
+                        'share', p.share, 
+                        'username', u.username
+                    )
+                ) AS payees
+            FROM 
+                transactions t
+            LEFT JOIN 
+                payees p ON t.tx_id = p.tx_id
+            LEFT JOIN 
+                users u ON p.payee_id = u.id
+            WHERE 
+                t.creditor_id = ?
+            GROUP BY 
+                t.tx_id;
+            `
         ).bind(userId).all();
 
         // Get transactions where the user is a payee
         const payeeTransactions = await c.env.DB.prepare(
-            `SELECT t.*, 
-                    json_group_array(json_object('payee_id', p.payee_id, 'share', p.share)) AS payees
-             FROM transactions t
-             JOIN payees p ON t.tx_id = p.tx_id
-             WHERE p.payee_id = ?
-             GROUP BY t.tx_id`
+            `SELECT 
+                t.*, 
+                json_group_array(
+                    json_object(
+                        'payee_id', p.payee_id, 
+                        'share', p.share, 
+                        'username', u.username
+                    )
+                ) AS payees,
+                creditor_user.username AS creditor_username
+            FROM 
+                transactions t
+            JOIN 
+                payees p ON t.tx_id = p.tx_id
+            JOIN 
+                users u ON p.payee_id = u.id
+            JOIN 
+                users creditor_user ON t.creditor_id = creditor_user.id
+            WHERE 
+                p.payee_id = ?
+            GROUP BY 
+                t.tx_id;
+            `
         ).bind(userId).all();
 
         // Parse the payees JSON string into an array
@@ -403,6 +450,29 @@ app.get('/users/:userId', authMiddleware, async (c) => {
             id: user.id,
             username: user.username,
             created_at: user.created_at
+        });
+    } catch (err) {
+        return c.json({ error: 'Server error' }, 500);
+    }
+});
+
+// Get current user details based on session token
+app.get('/me', authMiddleware, async (c) => {
+    const userId = c.get('userId'); // Get the user ID from the context
+
+    try {
+        // Fetch user details from the database
+        const user = await c.env.DB.prepare(
+            'SELECT id, username FROM users WHERE id = ?'
+        ).bind(userId).first();
+
+        if (!user) {
+            return c.json({ error: 'User not found' }, 404);
+        }
+
+        return c.json({
+            id: user.id,
+            username: user.username
         });
     } catch (err) {
         return c.json({ error: 'Server error' }, 500);

@@ -1,370 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Dept Management Dashboard</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .logout-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-        }
-        .add-transaction-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .section {
-            margin-bottom: 40px;
-        }
-        .transaction-item {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .user-card {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .load-more-button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .clear-all-button {
-            padding: 5px 10px;
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .payee-list {
-            margin-top: 10px;
-        }
-        .payee-item {
-            padding: 5px;
-            border: 1px solid #eee;
-            margin-top: 5px;
+            font-family: 'Roboto', sans-serif;
         }
     </style>
-    <script>
-        const API_URL = 'https://main-app.sswsuport.workers.dev';
-        let sessionToken = localStorage.getItem('sessionToken');
-        let userId = null;
-
-        // Redirect to auth.html if not logged in
-        if (!sessionToken) {
-            window.location.href = 'auth.html';
-        }
-
-        // Fetch user details and transactions on page load
-        window.onload = async () => {
-            await fetchUserDetails();
-            await fetchTransactions();
-            await fetchUserBalances();
-        };
-
-        // Fetch user details (e.g., user ID)
-        async function fetchUserDetails() {
-            try {
-                const response = await fetch(`${API_URL}/transactions`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch user details');
-                }
-
-                const data = await response.json();
-                userId = data.creditor_transactions?.[0]?.creditor_id || data.payee_transactions?.[0]?.payee_id;
-            } catch (error) {
-                console.error('Error fetching user details:', error);
-                logout();
-            }
-        }
-
-        // Fetch transactions related to the current user
-        async function fetchTransactions() {
-            try {
-                const response = await fetch(`${API_URL}/transactions`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch transactions');
-                }
-
-                const data = await response.json();
-                renderTransactions(data.creditor_transactions, data.payee_transactions);
-            } catch (error) {
-                console.error('Error fetching transactions:', error);
-            }
-        }
-
-        // Render transactions
-        async function renderTransactions(creditorTransactions, payeeTransactions) {
-            const transactionsContainer = document.getElementById('transactions');
-            transactionsContainer.innerHTML = '';
-
-            const allTransactions = [...(creditorTransactions || []), ...(payeeTransactions || [])];
-            allTransactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            for (const tx of allTransactions) {
-                // Fetch full transaction details including payees
-                const txDetails = await fetchTransactionDetails(tx.tx_id);
-                const txElement = document.createElement('div');
-                txElement.className = 'transaction-item';
-                txElement.innerHTML = `
-                    <div>
-                        <strong>${txDetails.description}</strong> - $${txDetails.amount}
-                        <br>
-                        <small>${new Date(txDetails.created_at).toLocaleString()}</small>
-                        <div class="payee-list">
-                            ${txDetails.payees.map(payee => `
-                                <div class="payee-item">
-                                    Payee ID: ${payee.payee_id}, Share: $${payee.share}, Paid: ${payee.paid ? 'Yes' : 'No'}
-                                </div>
-                            `).join('')}
+</head>
+<body class="bg-light">
+<!-- navbar start -->
+<p style="margin-top: 70px;"></p>
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+ <div class="container">
+  <a class="navbar-brand font-weight-bold" href="#">
+   Dept Manager
+  </a>
+  <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" class="navbar-toggler" data-target="#navbarNav" data-toggle="collapse" type="button">
+   <span class="navbar-toggler-icon">
+   </span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+   <ul class="navbar-nav ml-auto">
+    <li class="nav-item">
+     <a class="nav-link" href="/index.html">
+      Home
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="/add-transaction.html">
+      Add Transaction
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="/transactions.html">
+      Transactions
+     </a>
+    </li>
+    <li class="nav-item">
+     <a class="nav-link" href="#" id="logout-link">
+      Logout
+     </a>
+    </li>
+   </ul>
+  </div>
+ </div>
+</nav>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+ document.getElementById('logout-link').addEventListener('click', function() {
+   localStorage.removeItem('sessionToken');
+   window.location.href = 'index.html';
+ });
+</script>
+<!-- navbar end -->
+    <div class="min-vh-100 d-flex flex-column">
+        <!-- Main Content -->
+        <div class="container flex-grow-1 py-5">
+            <div class="row">
+                <!-- Card 1: User Info -->
+                <div class="col-md-4 mb-4">
+                    <div class="bg-white p-4 rounded shadow">
+                        <div class="d-flex align-items-center" id="user-info">
+                            <!-- User info will be populated here by JavaScript -->
                         </div>
                     </div>
-                    ${txDetails.creditor_id === userId ? `<button onclick="deleteTransaction('${txDetails.tx_id}')">Delete</button>` : ''}
-                `;
-                transactionsContainer.appendChild(txElement);
-            }
-        }
+                </div>
+                <!-- Card 2: Recent Transactions -->
+                <div class="col-md-8 mb-4">
+                    <div class="bg-white p-4 rounded shadow">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="font-weight-bold">Recent Transactions</h5>
+                            <a href="/add-transaction.html"><button class="btn btn-primary" id="addTransactionButton">Add Transaction</button></a>
+                        </div>
+                        <ul class="list-unstyled" id="transaction-list">
+                            <!-- Transactions will be populated here by JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+                <!-- Card 3: Known Persons -->
+                <div class="col-12 mb-4">
+                    <div class="bg-white p-4 rounded shadow">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="font-weight-bold">Known Persons</h5>
+                            <button class="btn btn-primary" id="addKnownPersonButton" data-toggle="modal" data-target="#addKnownPersonModal">Add Known Person</button>
+                        </div>
+                        <ul class="list-unstyled" id="known-persons-list">
+                            <!-- Known persons will be populated here by JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <footer class="bg-primary text-white text-center py-3">
+            <p class="mb-0">© 2023 Dept Management. All rights reserved.</p>
+        </footer>
+    </div>
+    <!-- Add Known Person Modal -->
+    <div class="modal fade" id="addKnownPersonModal" tabindex="-1" role="dialog" aria-labelledby="addKnownPersonModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addKnownPersonModalLabel">Add Known Person</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="searchUserForm">
+                        <div class="form-group">
+                            <label for="searchUsername">Search Username</label>
+                            <input type="text" class="form-control" id="searchUsername" name="searchUsername" required/>
+                        </div>
+                    </form>
+                    <div class="mt-3" id="searchResults">
+                        <!-- Search results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const sessionToken = localStorage.getItem('sessionToken');
+            let knownPersons = [];
+            let currentUserId = null;
 
-        // Fetch full transaction details including payees
-        async function fetchTransactionDetails(txId) {
-            try {
-                const response = await fetch(`${API_URL}/transactions/${txId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch transaction details');
-                }
-
-                return await response.json();
-            } catch (error) {
-                console.error('Error fetching transaction details:', error);
-                return { payees: [] }; // Return empty payees array in case of error
-            }
-        }
-
-        // Delete a transaction
-        async function deleteTransaction(txId) {
-            try {
-                const response = await fetch(`${API_URL}/transactions/${txId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to delete transaction');
-                }
-
-                alert('Transaction deleted successfully');
-                await fetchTransactions();
-            } catch (error) {
-                console.error('Error deleting transaction:', error);
-            }
-        }
-
-        // Fetch user balances
-        async function fetchUserBalances() {
-            try {
-                const response = await fetch(`${API_URL}/transactions`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch user balances');
-                }
-
-                const data = await response.json();
-                const allTransactions = [...(data.creditor_transactions || []), ...(data.payee_transactions || [])];
-                const balances = await calculateBalances(allTransactions);
-                fetchUsernamesForBalances(balances);
-            } catch (error) {
-                console.error('Error fetching user balances:', error);
-            }
-        }
-
-        // Calculate balances between users
-        async function calculateBalances(transactions) {
-            const balances = {};
-            const processedTxIds = new Set(); // Track processed transaction IDs
-
-            for (const tx of transactions) {
-                // Skip if this transaction has already been processed
-                if (processedTxIds.has(tx.tx_id)) {
-                    continue;
-                }
-                processedTxIds.add(tx.tx_id); // Mark this transaction as processed
-
-                // Fetch full transaction details including payees
-                const txDetails = await fetchTransactionDetails(tx.tx_id);
-
-                if (txDetails.creditor_id === userId) {
-                    // Current user is the creditor
-                    txDetails.payees.forEach(payee => {
-                        if (!balances[payee.payee_id]) {
-                            balances[payee.payee_id] = 0;
-                        }
-                        balances[payee.payee_id] += payee.share;
-                    });
-                } else {
-                    // Current user is a payee
-                    if (!balances[txDetails.creditor_id]) {
-                        balances[txDetails.creditor_id] = 0;
-                    }
-                    const payee = txDetails.payees.find(p => p.payee_id === userId);
-                    if (payee) {
-                        balances[txDetails.creditor_id] -= payee.share;
-                    }
-                }
+            if (!sessionToken) {
+                alert('Session token not found. Please log in.');
+                return;
             }
 
-            return balances;
-        }
+            // Function to normalize date
+            function normalizeDate(dateString) {
+                const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+                return new Date(dateString).toLocaleDateString(undefined, options);
+            }
 
-        // Fetch usernames for user IDs in balances
-        async function fetchUsernamesForBalances(balances) {
-            const userIds = Object.keys(balances);
-            const userDetails = {};
+            // Fetch user info
+            $.ajax({
+                url: 'https://main-app.sswsuport.workers.dev/me',
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + sessionToken
+                },
+                success: function(response) {
+                    currentUserId = response.id;
+                    $('#user-info').html(`
+                        <img alt="User profile picture" class="rounded-circle mr-3" height="64" src="https://placehold.co/100x100" width="64"/>
+                        <div>
+                            <h5 class="font-weight-bold mb-0">${response.username}</h5>
+                            <p class="text-muted mb-0">UserID: ${response.id}</p>
+                        </div>
+                    `);
 
-            try {
-                for (const userId of userIds) {
-                    const response = await fetch(`${API_URL}/users/${userId}`, {
+                    // Fetch transactions
+                    $.ajax({
+                        url: 'https://main-app.sswsuport.workers.dev/transactions',
                         method: 'GET',
                         headers: {
-                            'Authorization': `Bearer ${sessionToken}`
+                            'Authorization': 'Bearer ' + sessionToken
+                        },
+                        success: function(transactionsResponse) {
+                            const sortedCreditorTransactions = transactionsResponse.creditor_transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                            const sortedPayeeTransactions = transactionsResponse.payee_transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                            const transactions = [...sortedCreditorTransactions, ...sortedPayeeTransactions];
+                            transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                            const recentTransactions = transactions.slice(0, 5);
+
+                            recentTransactions.forEach(transaction => {
+                                const role = transaction.creditor_id === response.id ? 'Creditor' : 'Payee';
+                                const date = normalizeDate(transaction.created_at);
+                                const amount = transaction.payees.reduce((sum, payee) => sum + parseFloat(payee.share), 0).toLocaleString();
+
+                                $('#transaction-list').append(`
+                                    <li class="p-4 bg-light rounded shadow mb-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span>TXID: ${transaction.tx_id}</span>
+                                            <span>$${amount}</span>
+                                        </div>
+                                        <p class="text-muted small">Date: ${date}</p>
+                                        <p class="text-muted small">Role: ${role}</p>
+                                    </li>
+                                `);
+                            });
+
+                            // Fetch known persons
+                            $.ajax({
+                                url: 'https://main-app.sswsuport.workers.dev/known-persons',
+                                method: 'GET',
+                                headers: {
+                                    'Authorization': 'Bearer ' + sessionToken
+                                },
+                                success: function(response) {
+                                    knownPersons = response.known_persons;
+                                    knownPersons.forEach(person => {
+                                        const totalOwed = transactionsResponse.payee_transactions
+                                            .filter(tx => tx.creditor_id === person.id)
+                                            .reduce((sum, tx) => sum + parseFloat(tx.payees.find(p => p.payee_id === currentUserId).share), 0);
+
+                                        const totalGiven = transactionsResponse.creditor_transactions
+                                            .filter(tx => tx.payees.some(p => p.payee_id === person.id))
+                                            .reduce((sum, tx) => sum + parseFloat(tx.payees.find(p => p.payee_id === person.id).share), 0);
+
+                                        const netAmount = totalGiven - totalOwed;
+                                        const netAmountClass = netAmount >= 0 ? 'text-success' : 'text-danger';
+
+                                        $('#known-persons-list').append(`
+                                            <li class="p-4 bg-light rounded shadow mb-3">
+                                                <div class="d-flex align-items-center justify-content-between">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-user-circle fa-2x mr-3"></i>
+                                                        <div>
+                                                            <span>${person.username}</span>
+                                                            <p class="text-muted small mb-0">Owed: $${totalOwed.toLocaleString()}</p>
+                                                            <p class="text-muted small mb-0">Given: $${totalGiven.toLocaleString()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <p class="small mb-0 ${netAmountClass}">$${netAmount.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        `);
+                                    });
+                                },
+                                error: function(error) {
+                                    console.error('Error fetching known persons:', error);
+                                }
+                            });
+                        },
+                        error: function(error) {
+                            console.error('Error fetching transactions:', error);
                         }
                     });
-
-                    if (response.ok) {
-                        const user = await response.json();
-                        userDetails[userId] = user.username;
-                    } else if (response.status === 404) {
-                        userDetails[userId] = `User ID: ${userId}`; // Fallback if user not found
-                    } else {
-                        throw new Error('Failed to fetch user details');
-                    }
+                },
+                error: function(error) {
+                    console.error('Error fetching user info:', error);
                 }
-
-                renderUserBalances(balances, userDetails);
-            } catch (error) {
-                console.error('Error fetching usernames:', error);
-            }
-        }
-
-        // Render user balances with usernames
-        function renderUserBalances(balances, userDetails) {
-            const userBalancesContainer = document.getElementById('user-balances');
-            userBalancesContainer.innerHTML = '';
-
-            Object.keys(balances).forEach(userId => {
-                const balance = balances[userId];
-                const username = userDetails[userId] || `User ID: ${userId}`; // Fallback to user ID if username is not found
-                const userCard = document.createElement('div');
-                userCard.className = 'user-card';
-                userCard.innerHTML = `
-                    <div>
-                        <strong>${username}</strong>
-                        <br>
-                        Balance: ${balance >= 0 ? '+' : '-'}$${Math.abs(balance)}
-                    </div>
-                    <button class="clear-all-button" onclick="clearAllTransactions('${userId}')">Clear All</button>
-                `;
-                userBalancesContainer.appendChild(userCard);
             });
-        }
 
-        // Clear all transactions with a user
-        async function clearAllTransactions(otherUserId) {
-            try {
-                const response = await fetch(`${API_URL}/transactions/clear`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${sessionToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ otherUserId })
-                });
+            // Search user on input change
+            $('#searchUsername').on('input', function() {
+                const username = $(this).val();
 
-                if (!response.ok) {
-                    throw new Error('Failed to clear transactions');
+                if (username.length > 0) {
+                    $.ajax({
+                        url: `https://main-app.sswsuport.workers.dev/search-users?username=${username}`,
+                        method: 'GET',
+                        headers: {
+                            'Authorization': 'Bearer ' + sessionToken
+                        },
+                        success: function(response) {
+                            const searchResults = $('#searchResults');
+                            searchResults.empty();
+
+                            if (response.users.length > 0) {
+                                response.users.forEach(user => {
+                                    if (user.id !== currentUserId) {
+                                        const isKnown = knownPersons.some(person => person.id === user.id);
+                                        searchResults.append(`
+                                            <div class="p-4 bg-light rounded shadow mb-2">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span>${user.username}</span>
+                                                    <button class="btn btn-sm ${isKnown ? 'btn-secondary disabled' : 'btn-primary'}" data-id="${user.id}" data-username="${user.username}" ${isKnown ? 'disabled' : ''}>${isKnown ? 'Known' : 'Add'}</button>
+                                                </div>
+                                            </div>
+                                        `);
+                                    }
+                                });
+
+                                // Add known person button click
+                                searchResults.find('button').on('click', function() {
+                                    const userId = $(this).data('id');
+                                    const username = $(this).data('username');
+                                    const button = $(this);
+
+                                    $.ajax({
+                                        url: 'https://main-app.sswsuport.workers.dev/known-persons',
+                                        method: 'POST',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + sessionToken,
+                                            'Content-Type': 'application/json'
+                                        },
+                                        data: JSON.stringify({ known_user_id: userId }),
+                                        success: function(response) {
+                                            button.text('Known').prop('disabled', true).removeClass('btn-primary').addClass('btn-secondary');
+                                            knownPersons.push({ id: userId, username: username });
+                                            $('#known-persons-list').append(`
+                                                <li class="p-4 bg-light rounded shadow mb-3">
+                                                    <div class="d-flex align-items-center justify-content-between">
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-user-circle fa-2x mr-3"></i>
+                                                            <div>
+                                                                <span>${username}</span>
+                                                                <p class="text-muted small mb-0">Owed: $0</p>
+                                                                <p class="text-muted small mb-0">Given: $0</p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-right">
+                                                            <p class="small mb-0 text-success">$0</p>
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            `);
+                                        },
+                                        error: function(error) {
+                                            console.error('Error adding known person:', error);
+                                            alert('Error adding known person.');
+                                        }
+                                    });
+                                });
+                            } else {
+                                searchResults.append('<p>No users found.</p>');
+                            }
+                        },
+                        error: function(error) {
+                            console.error('Error searching users:', error);
+                            alert('Error searching users.');
+                        }
+                    });
+                } else {
+                    $('#searchResults').empty();
                 }
-
-                alert('All transactions cleared successfully');
-                await fetchUserBalances();
-            } catch (error) {
-                console.error('Error clearing transactions:', error);
-            }
-        }
-
-        // Logout
-        function logout() {
-            localStorage.removeItem('sessionToken');
-            window.location.href = 'auth.html';
-        }
+            });
+        });
     </script>
-</head>
-<body>
-    <button class="logout-button" onclick="logout()">Logout</button>
-    <h1>Dashboard</h1>
-
-    <!-- Transactions Section -->
-    <div class="section">
-        <h2>Latest Transactions</h2>
-        <div id="transactions"></div>
-        <button class="load-more-button" onclick="fetchTransactions()">Load More</button>
-    </div>
-
-    <!-- User Balances Section -->
-    <div class="section">
-        <h2>User Balances</h2>
-        <div id="user-balances"></div>
-    </div>
-
-    <!-- Fixed Button to Add New Transaction -->
-    <button class="add-transaction-button" onclick="window.location.href='add-transaction.html'">Add Transaction</button>
 </body>
 </html>

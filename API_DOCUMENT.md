@@ -206,11 +206,11 @@ This endpoint requires the user to be authenticated. A valid session token is ne
           {
               "tx_id": "<transaction_id>",
               "creditor_id": "<creditor_id>",
-              "amount": "<amount>",
-              "date": "<date>",
+              "created_at": "<created_at>",
               "payees": [
                   {
                       "payee_id": "<payee_id>",
+                      "username": "<username>",
                       "share": "<share_amount>",
                   },
                   ...
@@ -222,11 +222,12 @@ This endpoint requires the user to be authenticated. A valid session token is ne
           {
               "tx_id": "<transaction_id>",
               "creditor_id": "<creditor_id>",
-              "amount": "<amount>",
-              "date": "<date>",
+              "creditor_username":	"<creditor_username>",
+              "created_at": "<created_at>",
               "payees": [
                   {
                       "payee_id": "<payee_id>",
+                      "username": "<username>",
                       "share": "<share_amount>",
                   },
                   ...
@@ -289,6 +290,32 @@ Get user details by ID. Requires authentication.
 ```
 - `404` - User not found.
 - `500` - Server error.
+
+---
+
+### 12. **GET /me**
+Retrieve the current user's details based on the session token. Requires authentication.
+
+#### Response
+- `200` - User details retrieved successfully.
+```json
+{
+  "id": "string",
+  "username": "string"
+}
+```
+- `404` - User not found.
+```json
+{
+  "error": "User not found"
+}
+```
+- `500` - Server error.
+```json
+{
+  "error": "Server error"
+}
+```
 
 ---
 
